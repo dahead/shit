@@ -1,0 +1,77 @@
+use std::env;
+use std::process::Command;
+use std::process::exit;
+
+fn main() {
+    // Get command-line arguments
+    let args: Vec<String> = env::args().collect();
+
+    // Handle no arguments or help request
+    if args.len() < 2 {
+        print_help();
+        exit(1);
+    }
+
+    match args[1].as_str() {
+        "-c" => cancel_shutdown(),
+        seconds if seconds.parse::<i32>().is_ok() => schedule_shutdown(seconds),
+        _ => {
+            eprintln!("Error: Invalid argument '{}'.", args[1]);
+            print_help();
+            exit(1);
+        }
+    }
+}
+
+fn schedule_shutdown(seconds: &str) {
+    // Parse seconds into an integer
+    let seconds: i32 = seconds.parse().expect("Failed to parse seconds");
+
+    if seconds <= 0 {
+        eprintln!("Error: The number of seconds must be greater than 0.");
+        print_help();
+        exit(1);
+    }
+
+    // Schedule the shutdown command
+    match Command::new("shutdown")
+        .arg("-h")
+        .arg(format!("+{}", seconds / 60)) // Convert seconds to minutes
+        .status()
+    {
+        Ok(status) if status.success() => {
+            println!("System shutdown scheduled in {} seconds.", seconds);
+        }
+        Ok(_) => {
+            eprintln!("Failed to schedule shutdown. Are you running as root?");
+            exit(1);
+        }
+        Err(e) => {
+            eprintln!("Error executing shutdown command: {}", e);
+            exit(1);
+        }
+    }
+}
+
+fn cancel_shutdown() {
+    // Execute the shutdown cancel command
+    match Command::new("shutdown").arg("-c").status() {
+        Ok(status) if status.success() => {
+            println!("Scheduled shutdown has been canceled.");
+        }
+        Ok(_) => {
+            eprintln!("Failed to cancel the shutdown. Are you running as root?");
+            exit(1);
+        }
+        Err(e) => {
+            eprintln!("Error executing shutdown cancel command: {}", e);
+            exit(1);
+        }
+    }
+}
+
+fn print_help() {
+    println!("Usage:");
+    println!("  shutdown_timer <seconds>  - Schedule a shutdown in the specified number of seconds.");
+    println!("  shutdown_timer -c         - Cancel a scheduled shutdown.");
+}
